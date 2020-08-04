@@ -7,7 +7,7 @@
   ```
 - whyis will be installed in /apps/whyis
 
-- In your knowledge graph directory, add the classifier agent to the list of inferencers in your config.py file:
+- In your knowledge graph directory, add the author affiliation agent to the list of inferencers in your config.py file:
   * Add the following import line: `import whyis_author_affiliation_agent.affiliation_agent as aa`
   * Add the following line to the `inferencers` item in the `Config` dictionary constructor: `"AffiliationAgent": aa.AffiliationAgent()`
 
