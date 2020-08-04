@@ -25,7 +25,7 @@ class AffiliationAgent(autonomic.GlobalChangeService):
 
     def get_query(self):
         query = '''SELECT ?s WHERE {
-    ?s ?p ?o .
+    ?s <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://purl.org/dc/terms/BibliographicResource> .
 }'''
         return query
 
