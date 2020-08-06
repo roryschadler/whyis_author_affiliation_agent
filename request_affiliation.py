@@ -46,7 +46,7 @@ def add_affils(data, graph):
         return error
 
     for auth in data['author']:
-        if 'affiliation' in auth:
+        if 'affiliation' in auth and len(auth['affiliation']) > 0:
             # attempt to get author URI by their name
             given, family, full = parse_name(auth)
             if given == "":
