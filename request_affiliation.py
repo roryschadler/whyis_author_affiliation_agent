@@ -4,6 +4,7 @@ from rdflib.namespace import PROV, FOAF, RDF
 import requests
 from json.decoder import JSONDecodeError
 import urllib.parse
+import re
 
 def parse_name(auth):
     """ Return the names of a given author.
@@ -74,12 +75,19 @@ def add_affils(data, graph):
                 # syntax to get response from query, will only loop once
                 for row in query_res:
                     auth_uri = row.auth
-                # add each affiliation to the DOI subgraph
-                for aff in auth['affiliation']:
-                    graph.add((auth_uri, PROV.actedOnBehalfOf, rdflib.Literal(aff['name'])))
-            # if the author RDF can't be found, create a new subgraph for them
+            # if the author RDF can't be uniquely identified, create a new
+            # subgraph for them
             else:
                 auth_uri = json_to_author(auth, graph)
+            # add each affiliation to the DOI subgraph, some are split over
+            # multiple JSON entries so string them together
+            full_affil = ""
+            for aff in auth['affiliation']:
+                full_affil += aff['name'] + " "
+            full_affil = re.sub(r"[\r\n]+", " ", full_affil)
+            full_affil = re.sub(r"\s\s+", " ", full_affil)
+            print(full_affil)
+            graph.add((auth_uri, PROV.actedOnBehalfOf, rdflib.Literal(full_affil)))
     return "ok"
 
 def json_to_author(auth, graph):
@@ -98,10 +106,6 @@ def json_to_author(auth, graph):
         graph.add((auth_uri, FOAF.givenName, rdflib.Literal(given)))
     if family != "":
         graph.add((auth_uri, FOAF.familyName, rdflib.Literal(family)))
-
-    if 'affiliation' in auth:
-        for aff in auth['affiliation']:
-            graph.add((auth_uri, PROV.actedOnBehalfOf, rdflib.Literal(aff['name'])))
 
     return auth_uri
 
