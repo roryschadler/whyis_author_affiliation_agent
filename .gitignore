@@ -10,3 +10,6 @@ dist/
 # testing data/outputs
 *.csv
 *.ttl
+
+# account file
+account.txt

@@ -83,6 +83,10 @@ def add_affils(data, graph):
     return "ok"
 
 def json_to_author(auth, graph):
+    """ Transforms author data from JSON to RDF, storing it in a graph.
+        Expects the incoming data to be in the format of CrossRef's DOI content
+        negotiation API, as given by:
+        <https://github.com/CrossRef/rest-api-doc/blob/master/api_format.md>"""
     given, family, full = parse_name(auth)
     auth_uri = rdflib.URIRef("http://example.org/" + urllib.parse.quote(given + family))
     graph.add((auth_uri, RDF.type, FOAF.Person))
@@ -103,9 +107,21 @@ def json_to_author(auth, graph):
 
 def get_affil_from_doi(doi, headers):
     """ Return affiliation data from a doi, if available.
-        Creator data is well-formed in Turtle format, but does
-        not contain affiliated institution data, only names.
-        Affiliated institutions can appear in the JSON data instead"""
+        Creator data obtained through content negotiation against the DOI
+        is well-formed in Turtle format, but does not contain affiliated
+        institution data, only creator names. Affiliated institutions can appear
+        in the JSON data instead, and thus can be grafted on to the otherwise
+        complete RDF data.
+
+        Requires the user to provide """
+    headers = {}
+    try:
+        with open("account.txt") as f:
+            headers["User-Agent"] = f.read().strip()
+    except FileNotFoundError:
+        print("Please provide a file `account.txt` with your email as the only",
+              "line, to be used in the User-Agent header for DOI requests.")
+        exit(1)
     json_headers = headers.copy()
     json_headers['Accept'] = "application/vnd.citationstyles.csl+json"
     ttl_headers = headers.copy()
@@ -124,26 +140,12 @@ def get_affil_from_doi(doi, headers):
             return msg, None
         # currently does nothing, but could remove unwanted triples from final product
         prune_affil_graph(doi_graph)
-
-        # if there is affiliation data to add from json, add it. else, we're done
-        if json_response:
-            msg = add_affils(json_response, doi_graph)
-        else:
-            msg = "ok"
-
-    # if there's no rdf data, then simply use json if it's available
-    elif json_response:
-        try:
-            data = json_response.json()
-        except JSONDecodeError:
-            msg = "doi returned bad json"
-            return msg, None
-        if 'author' not in data:
-            msg = "no authors"
-            return msg, None
-        for auth in data['author']:
-            auth_uri = json_to_author(auth, doi_graph)
         msg = "ok"
+
+    # if there is affiliation data to add from json, add it or append it
+    if json_response:
+        msg = add_affils(json_response, doi_graph)
+
     else:
         msg = "doi returned no data"
         return msg, None
@@ -154,7 +156,6 @@ if __name__ == '__main__':
     dois = pd.read_csv("queryResults.csv", header=None)
     doi_list = dois[0].to_list()
     broken = pd.DataFrame(columns=['reason','doi'])
-    source = pd.DataFrame(columns=['source','doi'])
     aff_count = 0
     totg = rdflib.Graph()
     for doi in doi_list:
@@ -163,5 +164,5 @@ if __name__ == '__main__':
             totg += affil_graph
         else:
             broken = broken.append({'reason':msg, 'doi':doi}, ignore_index=True)
-    source.to_csv("sources.csv")
     totg.serialize("test.ttl", format="turtle")
+    broken.to_csv("broken.csv", index=False)
