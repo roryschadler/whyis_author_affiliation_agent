@@ -14,6 +14,8 @@ from whyis import autonomic
 from whyis import nanopub
 from whyis.namespace import sioc_types, sioc, sio, dc, prov, whyis
 
+from .request_affiliation import
+
 class AffiliationAgent(autonomic.GlobalChangeService):
     activity_class = whyis.AffiliationAgent
 
@@ -30,4 +32,9 @@ class AffiliationAgent(autonomic.GlobalChangeService):
         return query
 
     def process(self, i, o):
-        pass
+        # retrieve information about the doi
+        msg, graph = get_affil_from_doi(str(i.identifier))
+        # if all went well, add all new information into o
+        if msg == "ok":
+            for sub, pred, obj in graph.triples((None, None, None)):
+                o.graph.add((sub, pred, obj))
