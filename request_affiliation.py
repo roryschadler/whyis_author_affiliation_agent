@@ -1,113 +1,37 @@
-import pandas as pd
 import rdflib
-from rdflib.namespace import PROV, FOAF, RDF
+from rdflib.namespace import PROV, FOAF, RDF, DCTERMS, Namespace
+GEO = Namespace("http://www.w3.org/2003/01/geo/wgs84_pos#")
+
 import requests
 from json.decoder import JSONDecodeError
 import urllib.parse
 import re
 
-def parse_name(auth):
-    """ Return the names of a given author.
-        Expects the incoming data to be in the format of CrossRef's DOI content
-        negotiation API, as given by:
-        <https://github.com/CrossRef/rest-api-doc/blob/master/api_format.md>"""
-    full = ""
-    if 'given' in auth:
-        given = auth['given']
-        full += given + " "
-    else:
-        given = ""
-    if 'family' in auth:
-        family = auth['family']
-        full += family
-    else:
-        family = ""
-    return given, family, full.strip()
+from arcgis.gis import GIS
+from arcgis.geocoding import geocode
 
-def prune_affil_graph(graph):
-    """ Remove unwanted data from the DOI subgraph.
-        Syntax is `graph.remove((sub, pred, obj))`
-        Replacing one of `sub`, `pred`, `obj` with `None` makes it
-        a wildcard."""
-    pass
+USER_AGENT = ""
+try:
+    with open("useragent.txt") as f:
+        USER_AGENT = f.read().strip()
+except FileNotFoundError:
+    msg = ("Please provide a file `useragent.txt` with your email as the only"
+          "line, to be used in the User-Agent header for DOI requests.")
+    raise FileNotFoundError(msg) from FileNotFoundError
 
-def add_affils(data, graph):
-    """ Use supplied JSON data to add affiliation triples to the DOI subgraph.
-        Searches for the author by name, and adds affiliation data for them.
-        If the author can't be identified, creates a dummy URI for them and
-        marks it for review."""
-    try:
-        data = data.json()
-    except JSONDecodeError:
-        error = "doi returned bad json"
-        return error
-    if 'author' not in data:
-        error = "no authors"
-        return error
-
-    for auth in data['author']:
-        if 'affiliation' in auth and len(auth['affiliation']) > 0:
-            # attempt to get author URI by their name
-            given, family, full = parse_name(auth)
-            if given == "":
-                query = """SELECT DISTINCT ?auth WHERE {
-                    { ?auth foaf:familyName ?famname . }
-                    UNION { ?auth foaf:name ?fname . }
-                }"""
-            elif family == "":
-                query = """SELECT DISTINCT ?auth WHERE {
-                    { ?auth foaf:givenName ?gname . }
-                    UNION { ?auth foaf:name ?fname . }
-                }"""
-            else:
-                query = """SELECT DISTINCT ?auth WHERE {
-                   { ?auth foaf:givenName ?gname ;
-                           foaf:familyName ?famname . }
-                   UNION { ?auth foaf:name ?fname . }
-               }"""
-            query_res = graph.query(query,
-                                    initBindings={'gname': rdflib.Literal(given),
-                                                  'famname': rdflib.Literal(family),
-                                                  'fname': rdflib.Literal(full)},
-                                    initNs={'foaf':FOAF})
-            # confirm the query successfully identified the author
-            if len(query_res) == 1:
-                # syntax to get response from query, will only loop once
-                for row in query_res:
-                    auth_uri = row.auth
-            # if the author RDF can't be uniquely identified, create a new
-            # subgraph for them
-            else:
-                auth_uri = json_to_author(auth, graph)
-            # add each affiliation to the DOI subgraph, some are split over
-            # multiple JSON entries so string them together
-            full_affil = ""
-            for aff in auth['affiliation']:
-                full_affil += aff['name'] + " "
-            full_affil = re.sub(r"[\r\n]+", " ", full_affil)
-            full_affil = re.sub(r"\s\s+", " ", full_affil)
-            print(full_affil)
-            graph.add((auth_uri, PROV.actedOnBehalfOf, rdflib.Literal(full_affil)))
-    return "ok"
-
-def json_to_author(auth, graph):
-    """ Transforms author data from JSON to RDF, storing it in a graph.
-        Expects the incoming data to be in the format of CrossRef's DOI content
-        negotiation API, as given by:
-        <https://github.com/CrossRef/rest-api-doc/blob/master/api_format.md>"""
-    given, family, full = parse_name(auth)
-    auth_uri = rdflib.URIRef("http://example.org/" + urllib.parse.quote(given + family))
-    graph.add((auth_uri, RDF.type, FOAF.Person))
-
-    # add names if no parts were missing
-    if full != given and full != family and full != "":
-        graph.add((auth_uri, FOAF.name, rdflib.Literal(full)))
-    if given != "":
-        graph.add((auth_uri, FOAF.givenName, rdflib.Literal(given)))
-    if family != "":
-        graph.add((auth_uri, FOAF.familyName, rdflib.Literal(family)))
-
-    return auth_uri
+GIS_CLIENT = None
+try:
+    with open("arcgisclient.txt") as f:
+        GIS_CLIENT = f.read().strip()
+except FileNotFoundError:
+    msg = ("Please provide a file `arcgisclient.txt` with your ArcGIS application "
+          "client ID, to be used to log in to ArcGIS. If none is provided, the "
+          "agent may be unable to retrieve latitude/longitude data for affiliations.")
+    raise FileNotFoundError(msg) from FileNotFoundError
+if GIS_CLIENT is not None and GIS_CLIENT != "":
+    gis = GIS(client_id=GIS_CLIENT)
+else:
+    gis = GIS()
 
 def get_affil_from_doi(doi, headers):
     """ Return affiliation data from a doi, if available.
@@ -118,14 +42,7 @@ def get_affil_from_doi(doi, headers):
         complete RDF data.
 
         Requires the user to provide """
-    headers = {}
-    try:
-        with open("account.txt") as f:
-            headers["User-Agent"] = f.read().strip()
-    except FileNotFoundError:
-        print("Please provide a file `account.txt` with your email as the only",
-              "line, to be used in the User-Agent header for DOI requests.")
-        exit(1)
+    headers = {"User-Agent":USER_AGENT}
     json_headers = headers.copy()
     json_headers['Accept'] = "application/vnd.citationstyles.csl+json"
     ttl_headers = headers.copy()
@@ -155,7 +72,141 @@ def get_affil_from_doi(doi, headers):
         return msg, None
     return msg, doi_graph
 
+def add_affils(data, graph):
+    """ Use supplied JSON data to add affiliation triples to the DOI subgraph.
+        Searches for the author by name, and adds affiliation data for them.
+        If the author can't be identified, creates a dummy URI for them and
+        marks it for review."""
+    try:
+        data = data.json()
+    except JSONDecodeError:
+        error = "doi returned bad json"
+        return error
+    if 'author' not in data:
+        error = "no authors"
+        return error
+
+    for auth in data['author']:
+        if 'affiliation' in auth and len(auth['affiliation']) > 0:
+            auth_uri = get_author_uri(auth, graph)
+
+            # some affiliation names are split over multiple JSON entries
+            affil_name = ""
+            for aff_frag in auth['affiliation']:
+                affil_name += aff_frag['name'] + " "
+
+            # clean up the affiliation name
+            affil_name = affil_name.strip()
+            affil_name = re.sub(r"[\r\n]+", " ", affil_name)
+            affil_name = re.sub(r"\s\s+", " ", affil_name)
+
+            # retrieve affiliation coordinates, if available
+            aff_lat, aff_long = get_affiliation_coords(affil_name)
+
+            # insert affiliation subgraph
+            affiliation = rdflib.BNode()
+            graph.add((affiliation, FOAF.name, rdflib.Literal(affil_name)))
+            if aff_lat is not None and aff_long is not None:
+                graph.add((affiliation, GEO.lat, rdflib.Literal(aff_lat)))
+                graph.add((affiliation, GEO.long, rdflib.Literal(aff_long)))
+
+            # attach affiliation subgraph to author, DOI
+            graph.add((auth_uri, PROV.actedOnBehalfOf, affiliation))
+            graph.add((rdflib.URIRef(doi), DCTERMS.contributor, affiliation))
+    return "ok"
+
+def get_author_uri(auth, graph):
+    given, family, full = parse_name(auth)
+    if given == "":
+        query = """SELECT DISTINCT ?auth WHERE {
+            { ?auth foaf:familyName ?famname . }
+            UNION { ?auth foaf:name ?fname . }
+        }"""
+    elif family == "":
+        query = """SELECT DISTINCT ?auth WHERE {
+            { ?auth foaf:givenName ?gname . }
+            UNION { ?auth foaf:name ?fname . }
+        }"""
+    else:
+        query = """SELECT DISTINCT ?auth WHERE {
+           { ?auth foaf:givenName ?gname ;
+                   foaf:familyName ?famname . }
+           UNION { ?auth foaf:name ?fname . }
+       }"""
+    query_res = graph.query(query,
+                            initBindings={'gname': rdflib.Literal(given),
+                                          'famname': rdflib.Literal(family),
+                                          'fname': rdflib.Literal(full)},
+                            initNs={'foaf':FOAF})
+    # confirm the query successfully identified the author
+    if len(query_res) == 1:
+        # syntax to get response from query, will only loop once
+        for row in query_res:
+            auth_uri = row.auth
+    # if the author RDF can't be uniquely identified, create a new
+    # subgraph for them
+    else:
+        auth_uri = json_to_author(auth, graph)
+
+    return auth_uri
+
+def json_to_author(auth, graph):
+    """ Transforms author data from JSON to RDF, storing it in a graph.
+        Expects the incoming data to be in the format of CrossRef's DOI content
+        negotiation API, as given by:
+        <https://github.com/CrossRef/rest-api-doc/blob/master/api_format.md>"""
+    given, family, full = parse_name(auth)
+    auth_uri = rdflib.URIRef("http://example.org/" + urllib.parse.quote(given + family))
+    graph.add((auth_uri, RDF.type, FOAF.Person))
+
+    # add names if no parts were missing
+    if full != given and full != family and full != "":
+        graph.add((auth_uri, FOAF.name, rdflib.Literal(full)))
+    if given != "":
+        graph.add((auth_uri, FOAF.givenName, rdflib.Literal(given)))
+    if family != "":
+        graph.add((auth_uri, FOAF.familyName, rdflib.Literal(family)))
+
+    return auth_uri
+
+def parse_name(auth):
+    """ Return the names of a given author.
+        Expects the incoming data to be in the format of CrossRef's DOI content
+        negotiation API, as given by:
+        <https://github.com/CrossRef/rest-api-doc/blob/master/api_format.md>"""
+    full = ""
+    if 'given' in auth:
+        given = auth['given']
+        full += given + " "
+    else:
+        given = ""
+    if 'family' in auth:
+        family = auth['family']
+        full += family
+    else:
+        family = ""
+    return given, family, full.strip()
+
+def get_affiliation_coords(location_name, score_limit=70):
+    if len(location_name) > 200:
+        location_name = location_name[-200:]
+    res = geocode(address=location_name, max_locations=1)[0]
+    if res['score'] < score_limit:
+        return None, None
+    else:
+        lat = res['location']['y']
+        long = res['location']['x']
+        return lat, long
+
+def prune_affil_graph(graph):
+    """ Remove unwanted data from the DOI subgraph.
+        Syntax is `graph.remove((sub, pred, obj))`
+        Replacing one of `sub`, `pred`, `obj` with `None` makes it
+        a wildcard."""
+    pass
+
 if __name__ == '__main__':
+    import pandas as pd
     headers = {'User-Agent':"mailto:rory.21@dartmouth.edu"}
     dois = pd.read_csv("queryResults.csv", header=None)
     doi_list = dois[0].to_list()
@@ -168,5 +219,5 @@ if __name__ == '__main__':
             totg += affil_graph
         else:
             broken = broken.append({'reason':msg, 'doi':doi}, ignore_index=True)
-    totg.serialize("test.ttl", format="turtle")
+    totg.serialize("loctest.ttl", format="turtle")
     broken.to_csv("broken.csv", index=False)

@@ -12,5 +12,6 @@ dist/
 *.ttl
 out*.txt
 
-# account file
-account.txt
+# account files
+useragent.txt
+arcgisclient.txt
