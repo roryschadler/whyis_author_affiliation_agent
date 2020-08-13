@@ -33,15 +33,13 @@ if GIS_CLIENT is not None and GIS_CLIENT != "":
 else:
     gis = GIS()
 
-def get_affil_from_doi(doi, headers):
+def get_affil_from_doi(doi):
     """ Return affiliation data from a doi, if available.
         Creator data obtained through content negotiation against the DOI
         is well-formed in Turtle format, but does not contain affiliated
         institution data, only creator names. Affiliated institutions can appear
         in the JSON data instead, and thus can be grafted on to the otherwise
-        complete RDF data.
-
-        Requires the user to provide """
+        complete RDF data."""
     headers = {"User-Agent":USER_AGENT}
     json_headers = headers.copy()
     json_headers['Accept'] = "application/vnd.citationstyles.csl+json"
@@ -188,6 +186,10 @@ def parse_name(auth):
     return given, family, full.strip()
 
 def get_affiliation_coords(location_name, score_limit=70):
+    """ Return the latitude and longitude of a location.
+        Only returns the coordinates if the geocoder returns a score of at least
+        score_limit. Returns a tuple (latitude, longitude). Requires an ArcGIS
+        application, see <https://developers.arcgis.com/python/>"""
     if len(location_name) > 200:
         location_name = location_name[-200:]
     res = geocode(address=location_name, max_locations=1)[0]
@@ -207,14 +209,13 @@ def prune_affil_graph(graph):
 
 if __name__ == '__main__':
     import pandas as pd
-    headers = {'User-Agent':"mailto:rory.21@dartmouth.edu"}
     dois = pd.read_csv("queryResults.csv", header=None)
     doi_list = dois[0].to_list()
     broken = pd.DataFrame(columns=['reason','doi'])
     aff_count = 0
     totg = rdflib.Graph()
     for doi in doi_list:
-        msg, affil_graph = get_affil_from_doi(doi, headers)
+        msg, affil_graph = get_affil_from_doi(doi)
         if msg == "ok":
             totg += affil_graph
         else:
