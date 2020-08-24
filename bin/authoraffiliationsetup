@@ -1,0 +1,62 @@
+#!/bin/bash
+
+Help () {
+  echo "Usage: authoraffiliationsetup -e user_email [-c clientid]"
+  echo ""
+  echo "Email is used as identity for content negotiation."
+  echo "ArcGIS Client ID is used as identity for location requests."
+}
+
+SHORT=he:c::
+LONG=help,email:,clientid::
+
+options=$(getopt --options $SHORT --long $LONG --name "$0" -- "$@")
+
+if [ $? != 0 ] ; then
+  Help
+  exit 1
+fi
+
+eval set -- $options
+
+while true ; do
+  case "$1" in
+    -h )
+      echo "lol";HELP=true
+      ;;
+    -e | --email )
+      EMAIL="$2"
+      shift 2
+      ;;
+    -c | --clientid )
+      CLIENTID="$2"
+      shift 2
+      ;;
+    -- )
+      shift
+      break
+      ;;
+    *)
+      echo "Internal error!"
+      exit 1
+      ;;
+  esac
+done
+
+if [ "$HELP" = true ] ; then
+  Help
+  exit 0
+fi
+
+PACKAGE_LOC=$(python -c "import whyis_author_affiliation_agent as _; print(_.__path__[0])")
+
+if [ "$EMAIL" != "" ] ; then
+  echo "$EMAIL" > $PACKAGE_LOC/useragent.txt
+else
+  Help
+  exit 1
+fi
+
+if ["$CLIENTID" != "" ] ; then
+  echo "$CLIENTID" > $PACKAGE_LOC/arcgisclient.txt
+fi

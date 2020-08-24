@@ -12,9 +12,10 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/roryschadler/whyis_author_affiliation_agent",
-    packages=['whyis_author_affiliation_agent'],
+    packages=['whyis_author_affiliation_agent', 'bin'],
     install_requires=['rdflib',
                       'arcgis'],
+    scripts=['bin/authoraffiliationtest', 'bin/authoraffiliationsetup'],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",

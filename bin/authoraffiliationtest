@@ -1,0 +1,9 @@
+#!/bin/bash
+
+PACKAGE_LOC=$(python -c "import whyis_author_affiliation_agent as _; print(_.__path__[0])")
+
+cp $PACKAGE_LOC/test_Author_Affiliation_Agent.py /apps/whyis/tests
+
+pushd /apps/whyis
+python manage.py test --test test_Author_Affiliation_Agent
+popd
