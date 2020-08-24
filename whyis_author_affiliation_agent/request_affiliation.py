@@ -10,6 +10,7 @@ import re
 from arcgis.gis import GIS
 from arcgis.geocoding import geocode
 
+# Load the user's email, to be used for making content negotiation requests
 USER_AGENT = ""
 try:
     with open("useragent.txt") as f:
@@ -19,6 +20,9 @@ except FileNotFoundError:
           "line, to be used in the User-Agent header for DOI requests.")
     raise FileNotFoundError(msg) from FileNotFoundError
 
+# Load the user's ArcGIS account information, to be used when requesting
+# location data. Replace with alternate code if not using the application
+# client ID
 GIS_CLIENT = None
 try:
     with open("arcgisclient.txt") as f:
