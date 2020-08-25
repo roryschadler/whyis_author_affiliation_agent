@@ -17,7 +17,7 @@ from whyis.namespace import sioc_types, sioc, sio, dc, prov, whyis
 from .request_affiliation import
 
 class AffiliationAgent(autonomic.GlobalChangeService):
-    activity_class = whyis.AffiliationAgent
+    activity_class = URIRef("http://nanomine.org/ns/WhyisAuthorAffiliationAgentV001")
 
     def getInputClass(self):
         return sio.Entity
