@@ -14,7 +14,7 @@ from whyis import autonomic
 from whyis import nanopub
 from whyis.namespace import sioc_types, sioc, sio, dc, prov, whyis
 
-from .request_affiliation import
+from .request_affiliation import get_affil_from_doi
 
 class AffiliationAgent(autonomic.GlobalChangeService):
     activity_class = URIRef("http://nanomine.org/ns/WhyisAuthorAffiliationAgentV001")
