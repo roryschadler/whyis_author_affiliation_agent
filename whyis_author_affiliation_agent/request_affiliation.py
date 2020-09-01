@@ -1,3 +1,7 @@
+import pkg_resources
+from contextlib import closing
+from io import StringIO
+
 import rdflib
 from rdflib.namespace import PROV, FOAF, RDF, DCTERMS, Namespace
 GEO = Namespace("http://www.w3.org/2003/01/geo/wgs84_pos#")
@@ -7,35 +11,64 @@ from json.decoder import JSONDecodeError
 import urllib.parse
 import re
 
-from arcgis.gis import GIS
-from arcgis.geocoding import geocode
+from geopy.geocoders import ArcGIS
 
 # Load the user's email, to be used for making content negotiation requests
 USER_AGENT = ""
 try:
-    with open("useragent.txt") as f:
-        USER_AGENT = f.read().strip()
+    with closing(pkg_resources.resource_stream(__name__, "useragent.txt")) as f:
+        rbytes = f.read()
+        USER_AGENT = str(StringIO(rbytes.decode('utf-8'))).strip()
 except FileNotFoundError:
-    msg = ("Please provide a file `useragent.txt` with your email as the only"
+    msg = ("Please provide a file `useragent.txt` with your email as the only "
           "line, to be used in the User-Agent header for DOI requests.")
     raise FileNotFoundError(msg) from FileNotFoundError
+except Exception as e:
+    msg = getattr(e, 'message', '') or str(e)
+    raise ValueError("While opening `useragent.txt`\n{}\nPlease provide a file "
+                     "`useragent.txt` with your email as the only line, to be "
+                     "used in the User-Agent header for DOI requests.".format(msg))
+
 
 # Load the user's ArcGIS account information, to be used when requesting
-# location data. Replace with alternate code if not using the application
-# client ID
-GIS_CLIENT = None
+# location data.
+GIS_USER = None
+GIS_PWD = None
+GIS_REFERER = None
 try:
-    with open("arcgisclient.txt") as f:
-        GIS_CLIENT = f.read().strip()
+    with closing(pkg_resources.resource_stream(__name__, "arcgisclient.txt")) as f:
+        rbytes = f.read()
+        lines = str(StringIO(rbytes.decode('utf-8'))).strip().split("\n")
+        if len(lines) >= 2:
+            GIS_USER = lines[0].strip()
+            GIS_PWD = lines[1].strip()
+        if len(lines) >= 3:
+            GIS_REFERER = lines[3].strip()
+        else:
+            GIS_REFERRER = "https://example.com"
 except FileNotFoundError:
-    msg = ("Please provide a file `arcgisclient.txt` with your ArcGIS application "
-          "client ID, to be used to log in to ArcGIS. If none is provided, the "
-          "agent may be unable to retrieve latitude/longitude data for affiliations.")
-    raise FileNotFoundError(msg) from FileNotFoundError
-if GIS_CLIENT is not None and GIS_CLIENT != "":
-    gis = GIS(client_id=GIS_CLIENT)
+    print("If you do not provide ArcGIS credentials, you may be unable to retrieve "
+          "latitude/longitude data for affiliations. If you are providing ArcGIS "
+          "credentials, please provide a file `arcgisclient.txt` with your ArcGIS "
+          "username, password, and a referer address (if you have one) on one line "
+          "each (in that order), to be used to log in to ArcGIS.")
+except Exception as e:
+    msg = getattr(e, 'message', '') or str(e)
+    raise ValueError("If you are providing ArcGIS credentials, please provide "
+                     "a file `arcgisclient.txt` with your ArcGIS username, "
+                     "password, and a referer address (if you have one) on one "
+                     "line each (in that order), to be used to log in to ArcGIS. "
+                     "If none is provided, the agent may be unable to retrieve "
+                     "latitude/longitude data for affiliations.\nWhile opening the "
+                     "file, there was an exception: {}".format(msg))
+if (GIS_USER and GIS_PWD and GIS_REFERER) and (GIS_USER != "" and GIS_PWD != ""):
+    gis = ArcGIS(username=GIS_USER, password=GIS_PWD, referer=GIS_REFERER)
 else:
-    gis = GIS()
+    gis = ArcGIS(user_agent=USER_AGENT)
+
+
+#########################################
+
 
 def get_affil_from_doi(doi):
     """ Return affiliation data from a doi, if available.
@@ -67,14 +100,14 @@ def get_affil_from_doi(doi):
 
     # if there is affiliation data to add from json, add it or append it
     if json_response:
-        msg = add_affils(json_response, doi_graph)
+        msg = add_affils(json_response, doi_graph, doi)
 
     else:
         msg = "doi returned no data"
         return msg, None
     return msg, doi_graph
 
-def add_affils(data, graph):
+def add_affils(data, graph, doi):
     """ Use supplied JSON data to add affiliation triples to the DOI subgraph.
         Searches for the author by name, and adds affiliation data for them.
         If the author can't be identified, creates a dummy URI for them and
@@ -196,7 +229,8 @@ def get_affiliation_coords(location_name, score_limit=70):
         application, see <https://developers.arcgis.com/python/>"""
     if len(location_name) > 200:
         location_name = location_name[-200:]
-    res = geocode(address=location_name, max_locations=1)[0]
+    loc = gis.geocode(query=location_name)
+    res = loc.raw
     if res['score'] < score_limit:
         return None, None
     else:

@@ -14,7 +14,7 @@ setuptools.setup(
     url="https://github.com/roryschadler/whyis_author_affiliation_agent",
     packages=['whyis_author_affiliation_agent', 'bin'],
     install_requires=['rdflib',
-                      'arcgis'],
+                      'geopy'],
     scripts=['bin/authoraffiliationtest', 'bin/authoraffiliationsetup'],
     classifiers=[
         "Programming Language :: Python :: 3",
