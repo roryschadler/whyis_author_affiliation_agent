@@ -53,3 +53,4 @@ fi
 
 if [ "$REFERER" != "" ] ; then
     echo "$REFERER" >> $PACKAGE_LOC/arcgisclient.txt
+fi
