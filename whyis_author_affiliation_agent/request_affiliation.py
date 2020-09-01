@@ -21,13 +21,15 @@ try:
         USER_AGENT = str(StringIO(rbytes.decode('utf-8'))).strip()
 except FileNotFoundError:
     msg = ("Please provide a file `useragent.txt` with your email as the only "
-          "line, to be used in the User-Agent header for DOI requests.")
+          "line, to be used in the User-Agent header for DOI requests. Run the "
+           "command `authoraffiliationsetup -h` to learn how.")
     raise FileNotFoundError(msg) from FileNotFoundError
 except Exception as e:
     msg = getattr(e, 'message', '') or str(e)
-    raise ValueError("While opening `useragent.txt`\n{}\nPlease provide a file "
-                     "`useragent.txt` with your email as the only line, to be "
-                     "used in the User-Agent header for DOI requests.".format(msg))
+    raise ValueError("Please provide a file `useragent.txt` with your email as "
+                     "the only line, to be used in the User-Agent header for "
+                     "DOI requests. Run the command `authoraffiliationsetup -h` "
+                     "to learn how.\nWhile opening `useragent.txt`\n{}\n".format(msg))
 
 
 # Load the user's ArcGIS account information, to be used when requesting
@@ -51,7 +53,8 @@ except FileNotFoundError:
           "latitude/longitude data for affiliations. If you are providing ArcGIS "
           "credentials, please provide a file `arcgisclient.txt` with your ArcGIS "
           "username, password, and a referer address (if you have one) on one line "
-          "each (in that order), to be used to log in to ArcGIS.")
+          "each (in that order), to be used to log in to ArcGIS. Run the command "
+          "`authoraffiliationsetup -h` to learn how.")
 except Exception as e:
     msg = getattr(e, 'message', '') or str(e)
     raise ValueError("If you are providing ArcGIS credentials, please provide "
@@ -59,8 +62,9 @@ except Exception as e:
                      "password, and a referer address (if you have one) on one "
                      "line each (in that order), to be used to log in to ArcGIS. "
                      "If none is provided, the agent may be unable to retrieve "
-                     "latitude/longitude data for affiliations.\nWhile opening the "
-                     "file, there was an exception: {}".format(msg))
+                     "latitude/longitude data for affiliations. Run the command "
+                     "`authoraffiliationsetup -h` to learn how.\nWhile opening the "
+                     "file `arcgisclient.txt`, there was an exception: {}".format(msg))
 if (GIS_USER and GIS_PWD and GIS_REFERER) and (GIS_USER != "" and GIS_PWD != ""):
     gis = ArcGIS(username=GIS_USER, password=GIS_PWD, referer=GIS_REFERER)
 else:

@@ -1,62 +1,55 @@
 #!/bin/bash
 
 Help () {
-  echo "Usage: authoraffiliationsetup -e user_email [-c clientid]"
-  echo ""
-  echo "Email is used as identity for content negotiation."
-  echo "ArcGIS Client ID is used as identity for location requests."
+    echo "Usage: authoraffiliationsetup -e user_email [-u arcgis_username -p arcgis_password -r referer_url]"
+    echo ""
+    echo "Email is used as identity for content negotiation."
+    echo "ArcGIS username and password used for location requests."
+    echo "Referer URL is optional."
 }
 
-SHORT=he:c::
-LONG=help,email:,clientid::
+SHORT=he:u::p::r::
 
-options=$(getopt --options $SHORT --long $LONG --name "$0" -- "$@")
-
-if [ $? != 0 ] ; then
-  Help
-  exit 1
-fi
-
-eval set -- $options
-
-while true ; do
-  case "$1" in
-    -h )
-      echo "lol";HELP=true
-      ;;
-    -e | --email )
-      EMAIL="$2"
-      shift 2
-      ;;
-    -c | --clientid )
-      CLIENTID="$2"
-      shift 2
-      ;;
-    -- )
-      shift
-      break
-      ;;
-    *)
-      echo "Internal error!"
-      exit 1
-      ;;
-  esac
+while getopts $SHORT FLAG ; do
+    case $FLAG in
+	h)
+	    HELP=true
+	    ;;
+	e)
+	    EMAIL="$OPTARG"
+	    ;;
+	u)
+	    USER="$OPTARG"
+	    ;;
+	p)
+	    PASS="$OPTARG"
+	    ;;
+	r)
+	    REFERER="$OPTARG"
+    esac
 done
 
 if [ "$HELP" = true ] ; then
-  Help
-  exit 0
+    Help
+    exit 0
 fi
 
 PACKAGE_LOC=$(python -c "import whyis_author_affiliation_agent as _; print(_.__path__[0])")
 
 if [ "$EMAIL" != "" ] ; then
-  echo "$EMAIL" > $PACKAGE_LOC/useragent.txt
+    echo "$EMAIL" > $PACKAGE_LOC/useragent.txt
 else
-  Help
-  exit 1
+    Help
+    exit 1
 fi
 
-if ["$CLIENTID" != "" ] ; then
-  echo "$CLIENTID" > $PACKAGE_LOC/arcgisclient.txt
+if [ "$USER" != "" ] ; then
+    echo "$USER" > $PACKAGE_LOC/arcgisclient.txt
 fi
+
+if [ "$PASS" != "" ] ; then
+    echo "$PASS" >> $PACKAGE_LOC/arcgisclient.txt
+fi
+
+if [ "$REFERER" != "" ] ; then
+    echo "$REFERER" >> $PACKAGE_LOC/arcgisclient.txt
