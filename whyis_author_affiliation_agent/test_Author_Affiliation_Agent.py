@@ -13,7 +13,6 @@ geo = Namespace("http://www.w3.org/2003/01/geo/wgs84_pos#")
 
 class AuthorAfiliationAgentTestCase(AgentUnitTestCase):
     def test_affiliation_retrieval(self):
-        return True
         np = nanopub.Nanopublication()
         np.assertion.parse(data='''{
         "@id": "http://dx.doi.org/10.1002/app.44347",
