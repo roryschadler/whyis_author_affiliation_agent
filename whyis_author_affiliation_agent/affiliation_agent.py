@@ -18,7 +18,7 @@ from .request_affiliation import AffiliationRetriever
 
 class AffiliationAgent(autonomic.GlobalChangeService):
     activity_class = URIRef("http://nanomine.org/ns/WhyisAuthorAffiliationAgentV001")
-    self.affil_ret = AffiliationRetriever()
+    affil_ret = None
 
     def getInputClass(self):
         return sio.Entity
@@ -33,6 +33,10 @@ class AffiliationAgent(autonomic.GlobalChangeService):
         return query
 
     def process(self, i, o):
+        # initialize affiliation retriever if it hasn't been
+        if self.affil_ret is None:
+            self.affil_ret = AffiliationRetriever()
+            
         # retrieve information about the doi
         msg, graph = self.affil_ret.get_affil_from_doi(str(i.identifier))
         # if all went well, add all new information into o
