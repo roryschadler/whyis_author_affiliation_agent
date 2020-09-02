@@ -36,6 +36,11 @@ fi
 
 PACKAGE_LOC=$(python -c "import whyis_author_affiliation_agent as _; print(_.__path__[0])")
 
+if [ "$PACKAGE_LOC" == "" ] ; then
+    echo "Please find your whyis_author_affiliation_agent installation, and run \`pip install -e .\`"
+    exit 1
+fi
+
 if [ "$EMAIL" != "" ] ; then
     echo "$EMAIL" > $PACKAGE_LOC/useragent.txt
 else
