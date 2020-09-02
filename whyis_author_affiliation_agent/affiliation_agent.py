@@ -14,10 +14,11 @@ from whyis import autonomic
 from whyis import nanopub
 from whyis.namespace import sioc_types, sioc, sio, dc, prov, whyis
 
-from .request_affiliation import get_affil_from_doi
+from .request_affiliation import AffiliationRetriever
 
 class AffiliationAgent(autonomic.GlobalChangeService):
     activity_class = URIRef("http://nanomine.org/ns/WhyisAuthorAffiliationAgentV001")
+    self.affil_ret = AffiliationRetriever()
 
     def getInputClass(self):
         return sio.Entity
@@ -33,7 +34,7 @@ class AffiliationAgent(autonomic.GlobalChangeService):
 
     def process(self, i, o):
         # retrieve information about the doi
-        msg, graph = get_affil_from_doi(str(i.identifier))
+        msg, graph = self.affil_ret.get_affil_from_doi(str(i.identifier))
         # if all went well, add all new information into o
         if msg == "ok":
             for sub, pred, obj in graph.triples((None, None, None)):
